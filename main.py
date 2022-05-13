@@ -20,94 +20,137 @@ import datetime
 import imutils
 import time
 import cv2
+import numpy as np
 
-def string_parser(coords_str):
+
+def string_parser(cords_str):
     cords = []
-    temp = coords_str.split(";")
+    temp = cords_str.split(";")
+    #print(temp)
+    '''for i in range (0,len(temp),2):
+        temp2 = temp[i].split(",")
+        temp2.append(temp[i+1].split(","))
+        print(temp2)
+        cords.append([temp2[0][1:],temp2[2][1:],temp2[1][:len(temp2[1])-2],temp2[3][len(temp2[3])-2]]) #x1,y1,x2,y2
+        print(cords)'''
     for i in temp:
-        cords.append([i[1],i[3],i[5],i[7]])
+        temp2 = i.split(",")
+        cords.append([int(temp2[0][1:]),int(temp2[1]),int(temp2[2]),int(temp2[3][:len(temp2[3])-1])])
+        #print(cords)
     return cords
 
-
-
+#def find_movement():
 
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
 ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
-args = vars(ap.parse_args())
+# Debug mode
+ap.add_argument("-d", "--debug", help="enabling debug mode", action='store_true')
+#
+
+# Setting mask
+ap.add_argument("-m", "--mask", help="mask regions coordinates in format (lb1x,rt1y);(lb2x,rt2y)")
+#
+
+# Setting bottom frame delta threshold
+ap.add_argument("-b", "--bottom_threshold", help="bottom frame delta threshold", type=int, default=25)
+#
+
+# Setting top frame delta threshold
+ap.add_argument("-t", "--top_threshold", help="top frame delta threshold", type=int, default=255)
+#
+
+args = ap.parse_args()
+args_dict = vars(args)
+
+'''mask_coordinates = string_parser(args_dict["mask"])
+b_threshold = args_dict["bottom_threshold"]
+t_threshold = args_dict["top_threshold"]'''
+mask_coordinates = string_parser("(20,20,150,150)")
+b_threshold = 25
+t_threshold = 225
+part = None
 # if the video argument is None, then we are reading from webcam
-if args.get("video", None) is None:
+if args_dict.get("video", None) is None:
     vs = VideoStream(src=0).start()
     time.sleep(2.0)
 # otherwise, we are reading from a video file
 else:
-    vs = cv2.VideoCapture(args["video"])
+    vs = cv2.VideoCapture(args_dict["video"])
 # initialize the first frame in the video stream
 firstFrame = None
 # loop over the frames of the video
-detection_mask = [[]]
-x1 = 20
-x2 = 150
-y1 = 20
-y2 = 150
+
+
 while True:
     # grab the current frame and initialize the occupied/unoccupied
     # text
     frame = vs.read()
-    frame = frame if args.get("video", None) is None else frame[1]
-    text = "Unoccupied"
+    frame = frame if args_dict.get("video", None) is None else frame[1]
+    text = "No movement"
     # if the frame could not be grabbed, then we have reached the end
     # of the video
     if frame is None:
         break
     # resize the frame, convert it to grayscale, and blur it
     frame = imutils.resize(frame, width=500)
-    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    for mask in mask_coordinates:
+        cv2.rectangle(frame, (mask[0],mask[1]), (mask[2], mask[3]), (225, 0, 0), 2)
+
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (21, 21), 0)
     # if the first frame is None, initialize it
     if firstFrame is None:
         firstFrame = gray
         continue
+
+
     # compute the absolute difference between the current frame and
-    # first frame
+    # reference frame
+
+    # foo = cv2.subtract(firstFrame, gray, dtype=cv2.CV_64F)
+    # frameDelta = np.abs(foo, out=foo)
     frameDelta = cv2.absdiff(firstFrame, gray)
-    thresh = cv2.threshold(frameDelta, 25, 255, cv2.THRESH_BINARY)[1]
+    thresh = cv2.threshold(frameDelta, b_threshold, t_threshold, cv2.THRESH_BINARY)[1]
     # dilate the thresholded image to fill in holes, then find contours
     # on thresholded image
     thresh = cv2.dilate(thresh, None, iterations=2)
-    part = thresh[x1:x2, y1:y2]
-    cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
+    
+    for mask in mask_coordinates:
+        #parts.append(thresh[mask[0]:mask[2], mask[1]:mask[3]])
+        part = thresh[mask[0]:mask[2], mask[1]:mask[3]]
+        cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
+        cnts = imutils.grab_contours(cnts)
     # loop over the contours
-    for c in cnts:
+        for c in cnts:
         # if the contour is too small, ignore it
-        if cv2.contourArea(c) < args["min_area"]:
-            continue
+            if cv2.contourArea(c) < args_dict["min_area"]:
+                continue
         # compute the bounding box for the contour, draw it on the frame,
         # and update the text
-        (x, y, w, h) = cv2.boundingRect(c)
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        text = "Occupied"
+            (x, y, w, h) = cv2.boundingRect(c)
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            text = "Movement detected"
         # draw the text and timestamp on the frame
-        cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-        cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
-                    (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+            cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
+                        (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
         # show the frame and record if the user presses a key
-        cv2.imshow("Security Feed", frame)
-        cv2.imshow("Thresh", thresh)
-        cv2.imshow("Frame Delta", frameDelta)
-        cv2.imshow("Cutted", part)
-        key = cv2.waitKey(1) & 0xFF
+            cv2.imshow("Security Feed", frame)
+            if args.debug:
+                cv2.imshow("Thresh", thresh)
+                cv2.imshow("Frame Delta", frameDelta)
+            key = cv2.waitKey(1) & 0xFF
         # if the `q` key is pressed, break from the lop
-        if key == ord("q"):
-            vs.stop() if args.get("video", None) is None else vs.release()
-            cv2.destroyAllWindows()
-            exit(0)
+            if key == ord("q"):
+                vs.stop() if args_dict.get("video", None) is None else vs.release()
+                cv2.destroyAllWindows()
+                exit(0)
+
 # cleanup the camera and close any open windows
-vs.stop() if args.get("video", None) is None else vs.release()
+vs.stop() if args_dict.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
 
