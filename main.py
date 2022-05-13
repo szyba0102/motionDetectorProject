@@ -21,6 +21,7 @@ import imutils
 import time
 import cv2
 
+
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
@@ -90,3 +91,4 @@ while True:
 # cleanup the camera and close any open windows
 vs.stop() if args.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
+
