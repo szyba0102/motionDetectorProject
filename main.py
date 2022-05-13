@@ -21,6 +21,15 @@ import imutils
 import time
 import cv2
 
+def string_parser(coords_str):
+    cords = []
+    temp = coords_str.split(";")
+    for i in temp:
+        cords.append([i[1],i[3],i[5],i[7]])
+    return cords
+
+
+
 
 # construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
@@ -37,6 +46,11 @@ else:
 # initialize the first frame in the video stream
 firstFrame = None
 # loop over the frames of the video
+detection_mask = [[]]
+x1 = 20
+x2 = 150
+y1 = 20
+y2 = 150
 while True:
     # grab the current frame and initialize the occupied/unoccupied
     # text
@@ -49,6 +63,7 @@ while True:
         break
     # resize the frame, convert it to grayscale, and blur it
     frame = imutils.resize(frame, width=500)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (21, 21), 0)
     # if the first frame is None, initialize it
@@ -62,7 +77,8 @@ while True:
     # dilate the thresholded image to fill in holes, then find contours
     # on thresholded image
     thresh = cv2.dilate(thresh, None, iterations=2)
-    cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,
+    part = thresh[x1:x2, y1:y2]
+    cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
     cnts = imutils.grab_contours(cnts)
     # loop over the contours
@@ -84,10 +100,13 @@ while True:
         cv2.imshow("Security Feed", frame)
         cv2.imshow("Thresh", thresh)
         cv2.imshow("Frame Delta", frameDelta)
+        cv2.imshow("Cutted", part)
         key = cv2.waitKey(1) & 0xFF
         # if the `q` key is pressed, break from the lop
         if key == ord("q"):
-            break
+            vs.stop() if args.get("video", None) is None else vs.release()
+            cv2.destroyAllWindows()
+            exit(0)
 # cleanup the camera and close any open windows
 vs.stop() if args.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
