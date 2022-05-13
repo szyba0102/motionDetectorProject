@@ -1,5 +1,10 @@
 
 
+
+print("yebac")
+print("multimedia")
+print("poraz 2")
+
 import cv2 as cv
 import numpy as np
 cap = cv.VideoCapture('exp.mp4')
@@ -14,3 +19,4 @@ while cap.isOpened():
         break
 cap.release()
 cv.destroyAllWindows()
+
