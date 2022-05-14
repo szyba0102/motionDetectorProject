@@ -67,10 +67,11 @@ args_dict = vars(args)
 '''mask_coordinates = string_parser(args_dict["mask"])
 b_threshold = args_dict["bottom_threshold"]
 t_threshold = args_dict["top_threshold"]'''
-mask_coordinates = string_parser("(20,20,150,150)")
+mask_coordinates = string_parser("(200,200,300,300);(20,20,150,150)")
 b_threshold = 25
 t_threshold = 225
-part = None
+parts = []
+check = False
 # if the video argument is None, then we are reading from webcam
 if args_dict.get("video", None) is None:
     vs = VideoStream(src=0).start()
@@ -116,10 +117,11 @@ while True:
     # dilate the thresholded image to fill in holes, then find contours
     # on thresholded image
     thresh = cv2.dilate(thresh, None, iterations=2)
-    
     for mask in mask_coordinates:
-        #parts.append(thresh[mask[0]:mask[2], mask[1]:mask[3]])
+    #part = thresh[mask_coordinates[0][0]:mask_coordinates[0][2], mask_coordinates[0][1]:mask_coordinates[0][3]]
+
         part = thresh[mask[0]:mask[2], mask[1]:mask[3]]
+        cv2.imshow("Part" + str(mask[0]), part)
         cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
@@ -130,26 +132,28 @@ while True:
                 continue
         # compute the bounding box for the contour, draw it on the frame,
         # and update the text
+            check = True
             (x, y, w, h) = cv2.boundingRect(c)
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            text = "Movement detected"
-        # draw the text and timestamp on the frame
-            cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-            cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
-                        (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
-        # show the frame and record if the user presses a key
-            cv2.imshow("Security Feed", frame)
-            if args.debug:
-                cv2.imshow("Thresh", thresh)
-                cv2.imshow("Frame Delta", frameDelta)
-            key = cv2.waitKey(1) & 0xFF
-        # if the `q` key is pressed, break from the lop
-            if key == ord("q"):
-                vs.stop() if args_dict.get("video", None) is None else vs.release()
-                cv2.destroyAllWindows()
-                exit(0)
 
+        # show the frame and record if the user presses a key
+    if check:
+        text = "Movement detected"
+        # draw the text and timestamp on the frame
+    cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+    cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
+                (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+    cv2.imshow("Security Feed", frame)
+    cv2.imshow("Thresh", thresh)
+    check = False
+    if args.debug:
+        cv2.imshow("Thresh", thresh)
+        cv2.imshow("Frame Delta", frameDelta)
+    key = cv2.waitKey(1) & 0xFF
+    # if the `q` key is pressed, break from the lop
+    if key == ord("q"):
+        break
 # cleanup the camera and close any open windows
 vs.stop() if args_dict.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
