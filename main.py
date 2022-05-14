@@ -11,16 +11,17 @@ import numpy as np
 def string_parser(cords_str):
     cords = []
     temp = cords_str.split(";")
-    #print(temp)
-    '''for i in range (0,len(temp),2):
-        temp2 = temp[i].split(",")
-        temp2.append(temp[i+1].split(","))
-        print(temp2)
-        cords.append([temp2[0][1:],temp2[2][1:],temp2[1][:len(temp2[1])-2],temp2[3][len(temp2[3])-2]]) #x1,y1,x2,y2
-        print(cords)'''
+    print(temp)
+    rectangle = []
     for i in temp:
         temp2 = i.split(",")
-        cords.append([int(temp2[0][1:]),int(temp2[1]),int(temp2[2]),int(temp2[3][:len(temp2[3])-1])])
+        print(temp2)
+        rectangle.append(int(temp2[0][1:]))
+        rectangle.append(int(temp2[1][:-1]))
+        if len(rectangle) == 4:
+            cords.append(rectangle)
+            print(rectangle)
+            rectangle = []
         #print(cords)
     return cords
 
@@ -35,7 +36,7 @@ ap.add_argument("-d", "--debug", help="enabling debug mode", action='store_true'
 #
 
 # Setting mask
-ap.add_argument("-m", "--mask", help="mask regions coordinates in format (lb1x,rt1y);(lb2x,rt2y)")
+ap.add_argument("-m", "--mask", help="mask regions coords in format (lb1x,lb1y);(rt1x,rt1y);(lb2x,lb2y);(rt2x,rt2y)")
 #
 
 # Setting bottom frame delta threshold
@@ -49,12 +50,15 @@ ap.add_argument("-t", "--top_threshold", help="top frame delta threshold", type=
 args = ap.parse_args()
 args_dict = vars(args)
 
-'''mask_coordinates = string_parser(args_dict["mask"])
+
+if args_dict.get("mask", None) is None:
+    mask_coordinates = []
+else:
+    mask_coordinates = string_parser(args_dict["mask"])
+
 b_threshold = args_dict["bottom_threshold"]
-t_threshold = args_dict["top_threshold"]'''
-mask_coordinates = string_parser("(200,200,400,400);(20,20,150,150)") # (x1,y1,x2,y2)
-b_threshold = 25
-t_threshold = 225
+t_threshold = args_dict["top_threshold"]
+
 parts = []
 check = False
 # if the video argument is None, then we are reading from webcam
@@ -81,6 +85,9 @@ while True:
         break
     # resize the frame, convert it to grayscale, and blur it
     frame = imutils.resize(frame, width=500)
+    if len(mask_coordinates) == 0:
+        frame_dimensions = frame.shape
+        mask_coordinates.append([0,0,frame_dimensions[1], frame_dimensions[0]])
     for mask in mask_coordinates:
         cv2.rectangle(frame, (mask[0],mask[1]), (mask[2], mask[3]), (225, 0, 0), 2)
 
