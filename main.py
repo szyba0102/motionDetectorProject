@@ -1,18 +1,3 @@
-# import cv2 as cv
-# import numpy as np
-# cap = cv.VideoCapture('exp.mp4')
-# while cap.isOpened():
-#     ret, frame = cap.read()
-#     # if frame is read correctly ret is True
-#     if not ret:
-#         print("Can't receive frame (stream end?). Exiting ...")
-#         break
-#     cv.imshow('frame', frame)
-#     if cv.waitKey(1) == ord('q'):
-#         break
-# cap.release()
-# cv.destroyAllWindows()
-
 # import the necessary packages
 from imutils.video import VideoStream
 import argparse
@@ -119,7 +104,8 @@ while True:
     thresh = cv2.dilate(thresh, None, iterations=2)
     for mask in mask_coordinates:
         part = thresh[mask[0]:mask[2], mask[1]:mask[3]]
-        cv2.imshow("Part" + str(mask[0]), part)
+        if args.debug:
+            cv2.imshow("Part" + str(mask[0]), part)
         cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
@@ -143,7 +129,6 @@ while True:
     cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
                 (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
     cv2.imshow("Security Feed", frame)
-    cv2.imshow("Thresh", thresh)
     check = False
     if args.debug:
         cv2.imshow("Thresh", thresh)
@@ -152,6 +137,19 @@ while True:
     # if the `q` key is pressed, break from the lop
     if key == ord("q"):
         break
+    elif key == ord("m"):
+        t_threshold += 2
+        print("top threshold set to: ", t_threshold)
+    elif key == ord("n"):
+        t_threshold -= 2
+        print("top threshold set to: ", t_threshold)
+    elif key == ord("b"):
+        b_threshold += 2
+        print("bottom threshold set to: ", b_threshold)
+    elif key == ord("v"):
+        b_threshold -= 2
+        print("bottom threshold set to: ", b_threshold)
+
 # cleanup the camera and close any open windows
 vs.stop() if args_dict.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
