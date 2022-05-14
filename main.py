@@ -67,7 +67,7 @@ args_dict = vars(args)
 '''mask_coordinates = string_parser(args_dict["mask"])
 b_threshold = args_dict["bottom_threshold"]
 t_threshold = args_dict["top_threshold"]'''
-mask_coordinates = string_parser("(200,200,300,300);(20,20,150,150)")
+mask_coordinates = string_parser("(200,200,400,400);(20,20,150,150)") # (x1,y1,x2,y2)
 b_threshold = 25
 t_threshold = 225
 parts = []
@@ -118,8 +118,6 @@ while True:
     # on thresholded image
     thresh = cv2.dilate(thresh, None, iterations=2)
     for mask in mask_coordinates:
-    #part = thresh[mask_coordinates[0][0]:mask_coordinates[0][2], mask_coordinates[0][1]:mask_coordinates[0][3]]
-
         part = thresh[mask[0]:mask[2], mask[1]:mask[3]]
         cv2.imshow("Part" + str(mask[0]), part)
         cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
@@ -134,7 +132,7 @@ while True:
         # and update the text
             check = True
             (x, y, w, h) = cv2.boundingRect(c)
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.rectangle(frame, (x+mask[0], y+mask[1]), (x+mask[0] + w, y + mask[1] + h), (0, 255, 0), 2)
 
         # show the frame and record if the user presses a key
     if check:
