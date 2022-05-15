@@ -62,7 +62,8 @@ args = ap.parse_args()
 args_dict = vars(args)
 
 if args_dict.get("mask", None) is None:
-    mask_coordinates = []
+
+    mask_coordinates = [[0,0,500,500]]
 else:
     mask_coordinates = string_parser(args_dict["mask"])
 
