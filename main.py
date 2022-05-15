@@ -7,6 +7,30 @@ import time
 import cv2
 import numpy as np
 
+previous_frames = []
+
+def get_reference_frame(previous_frames):
+    n = len(previous_frames)
+    if n == 0:
+        return None
+    ref_frame = previous_frames[0]
+    for i in range(len(previous_frames)):
+        if i == 0:
+            pass
+        else:
+            alpha = 1.0 / (i + 1)
+            beta = 1.0 - alpha
+            ref_frame = cv2.addWeighted(previous_frames[i], alpha, ref_frame, beta, 0.0)
+    return ref_frame
+
+def update_previous_frames(previous_frames, new_frame):
+    n = len(previous_frames)
+    if n < previous_tracked_frames_num:
+        previous_frames.append(new_frame)
+    else:
+        previous_frames.pop(0)
+        previous_frames.append(new_frame)
+
 
 def string_parser(cords_str):
     cords = []
@@ -25,65 +49,43 @@ def string_parser(cords_str):
         #print(cords)
     return cords
 
-#def find_movement():
 
-# construct the argument parser and parse the arguments
 ap = argparse.ArgumentParser()
 ap.add_argument("-v", "--video", help="path to the video file")
 ap.add_argument("-a", "--min-area", type=int, default=500, help="minimum area size")
-# Debug mode
 ap.add_argument("-d", "--debug", help="enabling debug mode", action='store_true')
-#
-
-# Setting mask
 ap.add_argument("-m", "--mask", help="mask regions coords in format (lb1x,lb1y);(rt1x,rt1y);(lb2x,lb2y);(rt2x,rt2y)")
-#
-
-# Setting bottom frame delta threshold
 ap.add_argument("-b", "--bottom_threshold", help="bottom frame delta threshold", type=int, default=25)
-#
-
-# Setting top frame delta threshold
-ap.add_argument("-t", "--top_threshold", help="top frame delta threshold", type=int, default=255)
-#
+ap.add_argument("-p", "--previous_frames", help="previous frames used to create reference frame", type=int, default=0)
 
 args = ap.parse_args()
 args_dict = vars(args)
-
 
 if args_dict.get("mask", None) is None:
     mask_coordinates = []
 else:
     mask_coordinates = string_parser(args_dict["mask"])
 
-b_threshold = args_dict["bottom_threshold"]
-t_threshold = args_dict["top_threshold"]
-
-parts = []
-check = False
-# if the video argument is None, then we are reading from webcam
 if args_dict.get("video", None) is None:
     vs = VideoStream(src=0).start()
     time.sleep(2.0)
-# otherwise, we are reading from a video file
 else:
     vs = cv2.VideoCapture(args_dict["video"])
-# initialize the first frame in the video stream
-firstFrame = None
-# loop over the frames of the video
 
+b_threshold = args_dict["bottom_threshold"]
+previous_tracked_frames_num = args_dict["previous_frames"]
+
+ref_frame = None
+check = False
 
 while True:
-    # grab the current frame and initialize the occupied/unoccupied
-    # text
     frame = vs.read()
     frame = frame if args_dict.get("video", None) is None else frame[1]
     text = "No movement"
-    # if the frame could not be grabbed, then we have reached the end
-    # of the video
+
     if frame is None:
         break
-    # resize the frame, convert it to grayscale, and blur it
+
     frame = imutils.resize(frame, width=500)
     if len(mask_coordinates) == 0:
         frame_dimensions = frame.shape
@@ -93,21 +95,16 @@ while True:
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (21, 21), 0)
-    # if the first frame is None, initialize it
-    if firstFrame is None:
-        firstFrame = gray
-        continue
 
+    if ref_frame is None:
+        ref_frame = gray
+    elif previous_tracked_frames_num > 0:
+        ref_frame = get_reference_frame(previous_frames)
+        update_previous_frames(previous_frames, gray)
 
-    # compute the absolute difference between the current frame and
-    # reference frame
+    frameDelta = cv2.absdiff(ref_frame, gray)
 
-    # foo = cv2.subtract(firstFrame, gray, dtype=cv2.CV_64F)
-    # frameDelta = np.abs(foo, out=foo)
-    frameDelta = cv2.absdiff(firstFrame, gray)
-    thresh = cv2.threshold(frameDelta, b_threshold, t_threshold, cv2.THRESH_BINARY)[1]
-    # dilate the thresholded image to fill in holes, then find contours
-    # on thresholded image
+    thresh = cv2.threshold(frameDelta, b_threshold, 255, cv2.THRESH_BINARY)[1]
     thresh = cv2.dilate(thresh, None, iterations=2)
     for mask in mask_coordinates:
         part = thresh[mask[0]:mask[2], mask[1]:mask[3]]
@@ -116,22 +113,15 @@ while True:
         cnts = cv2.findContours(part.copy(), cv2.RETR_EXTERNAL,
                             cv2.CHAIN_APPROX_SIMPLE)
         cnts = imutils.grab_contours(cnts)
-    # loop over the contours
         for c in cnts:
-        # if the contour is too small, ignore it
             if cv2.contourArea(c) < args_dict["min_area"]:
                 continue
-        # compute the bounding box for the contour, draw it on the frame,
-        # and update the text
             check = True
             (x, y, w, h) = cv2.boundingRect(c)
             cv2.rectangle(frame, (x+mask[0], y+mask[1]), (x+mask[0] + w, y + mask[1] + h), (0, 255, 0), 2)
-
-        # show the frame and record if the user presses a key
     if check:
         text = "Movement detected"
-        # draw the text and timestamp on the frame
-    cv2.putText(frame, "Room Status: {}".format(text), (10, 20),
+    cv2.putText(frame, "Status: {}".format(text), (10, 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
     cv2.putText(frame, datetime.datetime.now().strftime("%A %d %B %Y %I:%M:%S%p"),
                 (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
@@ -141,23 +131,16 @@ while True:
         cv2.imshow("Thresh", thresh)
         cv2.imshow("Frame Delta", frameDelta)
     key = cv2.waitKey(1) & 0xFF
-    # if the `q` key is pressed, break from the lop
     if key == ord("q"):
         break
-    elif key == ord("m"):
-        t_threshold += 2
-        print("top threshold set to: ", t_threshold)
-    elif key == ord("n"):
-        t_threshold -= 2
-        print("top threshold set to: ", t_threshold)
     elif key == ord("b"):
         b_threshold += 2
         print("bottom threshold set to: ", b_threshold)
     elif key == ord("v"):
-        b_threshold -= 2
+        if b_threshold >= 2:
+            b_threshold -= 2
         print("bottom threshold set to: ", b_threshold)
 
-# cleanup the camera and close any open windows
 vs.stop() if args_dict.get("video", None) is None else vs.release()
 cv2.destroyAllWindows()
 
