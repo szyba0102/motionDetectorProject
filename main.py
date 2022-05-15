@@ -35,18 +35,14 @@ def update_previous_frames(previous_frames, new_frame):
 def string_parser(cords_str):
     cords = []
     temp = cords_str.split(";")
-    print(temp)
     rectangle = []
     for i in temp:
         temp2 = i.split(",")
-        print(temp2)
         rectangle.append(int(temp2[0][1:]))
         rectangle.append(int(temp2[1][:-1]))
         if len(rectangle) == 4:
             cords.append(rectangle)
-            print(rectangle)
             rectangle = []
-        #print(cords)
     return cords
 
 
@@ -76,6 +72,7 @@ else:
 b_threshold = args_dict["bottom_threshold"]
 previous_tracked_frames_num = args_dict["previous_frames"]
 
+
 ref_frame = None
 check = False
 
@@ -101,6 +98,8 @@ while True:
         ref_frame = gray
     elif previous_tracked_frames_num > 0:
         ref_frame = get_reference_frame(previous_frames)
+
+    if previous_tracked_frames_num > 0:
         update_previous_frames(previous_frames, gray)
 
     frameDelta = cv2.absdiff(ref_frame, gray)
